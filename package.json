@@ -1,0 +1,20 @@
+{
+  "name": "redis-rate-limit",
+  "version": "1.0.0",
+  "description": "A simple rate limiter for Redis using ioredis",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "author": "Alex Vencel",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "ioredis": "^5.4.1"
+  }
+}
