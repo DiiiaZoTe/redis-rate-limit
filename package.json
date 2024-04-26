@@ -6,8 +6,10 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
+    "clean": "rm -rf dist",
     "link": "npm link",
-    "clean": "rm -rf dist"
+    "version": "npm version patch",
+    "publish": "npm publish"
   },
   "author": "Alex Vencel",
   "license": "ISC",
