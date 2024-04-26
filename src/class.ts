@@ -1,10 +1,11 @@
 import Redis from 'ioredis';
-import { Duration, ms } from './utils';
+import { ms } from './utils';
 
 const DEFAULT_CONFIG = {
-  window: "1s" as Duration,
+  window: 1000,
   limit: 1,
-  difference: "0ms" as Duration,
+  difference: 0,
+  ephemeralCache: true,
 }
 
 export type RateLimitConfig = {
@@ -13,21 +14,24 @@ export type RateLimitConfig = {
   /** prefix for redis key - useful to have multiple projects on one redis */
   prefix: string;
   /** 
-   * window with unit (ms, s, m, h, d)
-   * @example "1s" or "1 s"
-   * @default "1s" if not provided or < 0
+   * window in milliseconds
+   * @default 1000 if not provided or < 0
+   * @example 1000 or use:  
+   * ```ms("1s")``` or ```msPrecise(["1s"])``` (for multiple units)
    */
-  window?: Duration;
+  window?: number;
   /** 
    * max requests allowed in window
    * @default 1
    */
   limit?: number;
   /**
-   * time difference to account between 2 requests. Acts as a cooldown period.
-   * @default "0ms" (no difference)
+   * time difference in ms to account between 2 requests. Acts as a cooldown period.
+   * @default 0 (no difference)
+   * @example 1000 or use:  
+   * ```ms("1s")``` or ```msPrecise(["1s"])``` (for multiple units)
    */
-  difference?: Duration;
+  difference?: number;
   /** 
    * adds an in-memory cache to store the rate limit data 
    * @default true
@@ -63,9 +67,9 @@ export type RateLimitResponse = {
  * @param {RateLimitConfig} config RateLimitConfig
  * @param {Redis} config.redis ioredis client instance
  * @param {string} config.prefix prefix for redis key - useful to have multiple projects on one redis
- * @param {Duration} [config.window="1s"] window with unit (ms, s, m, h, d)
+ * @param {number} [config.window=1000] window with unit (ms, s, m, h, d)
  * @param {number} [config.limit=1] max requests allowed in window
- * @param {Duration} [config.difference="0ms"] time difference to account between 2 requests. Acts as a cooldown period.
+ * @param {number} [config.difference=0] time difference to account between 2 requests. Acts as a cooldown period.
  * @param {boolean} [config.ephemeralCache=true] adds an in-memory cache to store the rate limit data
  * @param {(error: any) => void} [config.logger=console.error] custom logging function
  * 
@@ -104,10 +108,10 @@ export class RateLimit {
   constructor({
     redis,
     prefix,
-    window,
-    limit = 1,
-    difference,
-    ephemeralCache = true,
+    window = DEFAULT_CONFIG.window,
+    limit = DEFAULT_CONFIG.limit,
+    difference = DEFAULT_CONFIG.difference,
+    ephemeralCache = DEFAULT_CONFIG.ephemeralCache,
     logger
   }: RateLimitConfig) {
     this.redis = redis;
@@ -120,36 +124,12 @@ export class RateLimit {
       throw new Error(`Failed to connect to Redis - ${error}`);
     });
 
-    // Ensure window size is valid
-    const defaultWindow = ms(DEFAULT_CONFIG.window); // we know this won't throw an error
-    if (window) {
-      let parsedWindow = defaultWindow;
-      try {
-        parsedWindow = ms(window);
-      } catch (error) {
-        console.error(`Failed to parse window size: ${window}, defaulting to ${DEFAULT_CONFIG.window}`);
-      }
-      this.window = parsedWindow >= 0 ? parsedWindow : defaultWindow;
+    this.window = window;
+    this.difference = difference;
+    if (this.difference > this.window) {
+      console.error(`Difference cannot be greater than window size. Defaulting to the window size`);
+      this.difference = this.window;
     }
-    else this.window = defaultWindow;
-
-
-    // Ensure difference size is valid
-    const defaultDifference = ms(DEFAULT_CONFIG.difference); // we know this won't throw an error
-    if (difference) {
-      let parsedDifference = defaultDifference;
-      try {
-        parsedDifference = ms(difference);
-      } catch (error) {
-        console.error(`Failed to parse difference size: ${difference}, defaulting to ${DEFAULT_CONFIG.difference}`);
-      }
-      this.difference = parsedDifference >= 0 ? parsedDifference : defaultDifference;
-      if (this.difference > this.window) {
-        console.error(`Difference cannot be greater than window size. Defaulting to the window size`);
-        this.difference = this.window;
-      }
-    }
-    else this.difference = defaultDifference;
 
     this.maxRequest = limit < 1 ? 5 : limit;
     this.prefix = prefix;
