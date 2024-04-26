@@ -126,7 +126,10 @@ export async function POST(
 }
 ```
 
-The nice thing about this approach is you can define multiple rate limiters for each route/action as need be.
+The nice thing about this approach is you can define multiple rate limiters
+for each route/action as need be. Make sure to change the `prefix` prop so there
+is no conflicts between your rate limiters. I like to use the app name and limiter name (what I'm limiting):
+``` `${app_name}/${limiter_name}` ```
 
 ---
 

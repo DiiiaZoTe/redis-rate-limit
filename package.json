@@ -2,6 +2,10 @@
   "name": "redis-rate-limit",
   "version": "1.0.0",
   "description": "A simple rate limiter for Redis using ioredis",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DiiiaZoTe/next-route-visualizer"
+  },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
