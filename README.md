@@ -1,12 +1,12 @@
 <div align="center">
-  <h1>redis-rate-limit</h1>
+  <h1>@diiiazote/redis-rate-limit</h1>
   <b>v1.0.0</b>
   <p>A simple rate limiter for Redis using ioredis</p>
 </div>
 
 ---
 
-Redis-rate-limit is an easy-to-use rate limiting library built for Node.js applications that rely on Redis for managing rate limits across distributed systems or single server setups. It utilizes ioredis for seamless integration with Redis and provides an developer friendly implemenation to manage request rates per identifier (e.g., user IP).
+@diiiazote/redis-rate-limit is an easy-to-use rate limiting library built for Node.js applications that rely on Redis for managing rate limits across distributed systems or single server setups. It utilizes ioredis for seamless integration with Redis and provides an developer friendly implemenation to manage request rates per identifier (e.g., user IP).
 
 ---
 
@@ -14,19 +14,19 @@ Redis-rate-limit is an easy-to-use rate limiting library built for Node.js appli
 
 ### Installation
 
-You can install **`redis-rate-limit`** using npm:
+You can install **`@diiiazote/redis-rate-limit`** using npm:
 
 ```
-npm install redis-rate-limit
+npm install @diiiazote/redis-rate-limit
 ```
 
 ### Importing + initialization
 
-To use `redis-rate-limit`, import the RateLimit class from the package and initialize it with a Redis client instance, and configuration parameters:
+To use `@diiiazote/redis-rate-limit`, import the RateLimit class from the package and initialize it with a Redis client instance, and configuration parameters:
 
 ```typescript
 import Redis from 'ioredis';
-import { RateLimit } from 'redis-rate-limit';
+import { RateLimit } from '@diiiazote/redis-rate-limit';
 
 const redisClient = new Redis(process.env.REDIS_URL_HERE);
 
@@ -57,12 +57,12 @@ Here is a table of properties you can configure for the `RateLimit` class:
 
 ### Express
 
-Here's how to use the `redis-rate-limit` in an express application to limit API requests:
+Here's how to use the `@diiiazote/redis-rate-limit` in an express application to limit API requests:
 
 ```typescript
 import express from 'express';
 import Redis from "ioredis";
-import { RateLimit } from 'redis-rate-limit';
+import { RateLimit } from '@diiiazote/redis-rate-limit';
 
 const app = express();
 const rateLimiter = new RateLimit({
@@ -88,13 +88,13 @@ app.listen(3000, () => {
 
 ### Next.js (self-hosted)
 
-Here's how to use the `redis-rate-limit` in Next.js. 
+Here's how to use the `@diiiazote/redis-rate-limit` in Next.js. 
 
 Define the rate limit instance outside of router function or server action.
 ```typescript
 // /lib/rate-limit.ts
 import Redis from "ioredis";
-import { RateLimit, RateLimitResponse, ms } from "redis-rate-limit";
+import { RateLimit, RateLimitResponse, ms } from "@diiiazote/redis-rate-limit";
 
 // define redis
 export const redis = new Redis(env.RATE_LIMIT_REDIS_HOST)
