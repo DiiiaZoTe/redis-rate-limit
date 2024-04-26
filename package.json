@@ -4,7 +4,7 @@
   "description": "A simple rate limiter for Redis using ioredis",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/DiiiaZoTe/next-route-visualizer"
+    "url": "git+https://github.com/DiiiaZoTe/redis-rate-limit"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
