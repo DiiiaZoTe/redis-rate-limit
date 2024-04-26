@@ -60,6 +60,16 @@ export type RateLimitResponse = {
 /**
  * RateLimit class to limit requests based on the IP address
  * 
+ * @param {RateLimitConfig} config RateLimitConfig
+ * @param {Redis} config.redis ioredis client instance
+ * @param {string} config.prefix prefix for redis key - useful to have multiple projects on one redis
+ * @param {Duration} [config.window="1s"] window with unit (ms, s, m, h, d)
+ * @param {number} [config.limit=1] max requests allowed in window
+ * @param {Duration} [config.difference="0ms"] time difference to account between 2 requests. Acts as a cooldown period.
+ * @param {boolean} [config.ephemeralCache=true] adds an in-memory cache to store the rate limit data
+ * @param {(error: any) => void} [config.logger=console.error] custom logging function
+ * 
+ * 
  * @example
  * ```typescript
  * import Redis from 'ioredis';
@@ -102,9 +112,13 @@ export class RateLimit {
   }: RateLimitConfig) {
     this.redis = redis;
     // Ensure the provided Redis client is valid
-    if (!this.redis || !(this.redis instanceof Redis)) {
-      throw new Error("A valid Redis client instance is required.");
+    if (!this.redis) {
+      throw new Error("No Redis client provided.");
     }
+    // Redis health check
+    this.redis.ping().catch((error) => {
+      throw new Error(`Failed to connect to Redis - ${error}`);
+    });
 
     // Ensure window size is valid
     const defaultWindow = ms(DEFAULT_CONFIG.window); // we know this won't throw an error
