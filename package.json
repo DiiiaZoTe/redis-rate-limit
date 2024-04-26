@@ -12,8 +12,7 @@
     "build": "tsc",
     "clean": "rm -rf dist",
     "link": "npm link",
-    "version": "npm version patch",
-    "publish": "npm publish --access=public"
+    "version": "npm version patch"
   },
   "author": "Alex Vencel",
   "license": "ISC",
