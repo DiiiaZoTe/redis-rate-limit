@@ -1,6 +1,6 @@
 <div align="center">
   <h1>@diiiazote/redis-rate-limit</h1>
-  <b>v1.0.1</b>
+  <b>v1.0.2</b>
   <p>A simple rate limiter for Redis using ioredis</p>
 </div>
 
@@ -50,6 +50,21 @@ Here is a table of properties you can configure for the `RateLimit` class:
 | `difference`     | `number`   | Minimum time interval between requests. Acts as a cooldown. | `0` or `ms("0s")`    |
 | `ephemeralCache` | `boolean`  | Whether to use an in-memory cache to store rate limit data. | `true`               |
 | `logger`         | `Function` | Custom function for logging errors.                         | `console.error`      |
+
+### RateLimit limit method response
+
+Here is a table of the response object for the `.limit` method:
+
+| Name         | Type                  | Description                                                      |
+| ------------ | --------------------- | ---------------------------------------------------------------- |
+| `key`        | `string`              | Key used for rate limiting.                                      |
+| `success`    | `boolean`             | Whether the request is allowed.                                  |
+| `remaining`  | `number`              | Number of requests remaining before hitting the rate limit.      |
+| `limit`      | `number`              | Maximum number of requests allowed within the rate limit window. |
+| `reset`      | `() => Promise<void>` | Function to reset the rate limit.                                |
+| `ttl`        | `number`              | Time to live in milliseconds until the rate limit resets.        |
+| `error`      | `string`              | Optional error message when the request fails.                   |
+| `statusCode` | `number`              | Status code indicating the type of response or error.            |
 
 ---
 
