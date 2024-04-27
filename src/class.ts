@@ -1,5 +1,4 @@
 import Redis from 'ioredis';
-import { ms } from './utils';
 
 const DEFAULT_CONFIG = {
   window: 1000,
@@ -73,7 +72,6 @@ export type RateLimitResponse = {
  * @param {boolean} [config.ephemeralCache=true] adds an in-memory cache to store the rate limit data
  * @param {(error: any) => void} [config.logger=console.error] custom logging function
  * 
- * 
  * @example
  * ```typescript
  * import Redis from 'ioredis';
@@ -112,7 +110,7 @@ export class RateLimit {
     limit = DEFAULT_CONFIG.limit,
     difference = DEFAULT_CONFIG.difference,
     ephemeralCache = DEFAULT_CONFIG.ephemeralCache,
-    logger
+    logger,
   }: RateLimitConfig) {
     this.redis = redis;
     // Ensure the provided Redis client is valid
@@ -144,12 +142,14 @@ export class RateLimit {
    */
   public async limit(id: string): Promise<RateLimitResponse> {
     const key = `${this.prefix}:${id}`; // key for redis
+    const differenceKey = `${key}:last`;
     const now = Date.now();
     try {
       // check local cache if the request is blocked
       if (this.localCache) {
         const cacheResult = this.localCache.isBlocked(key);
         if (cacheResult.blocked) {
+          // console.log("cache blocked the request");
           return this.createLimitResponse(false, 0, cacheResult.reset, key);
         }
       }
@@ -157,7 +157,9 @@ export class RateLimit {
       // when difference provided check if the request is too soon
       if (this.difference) {
         try {
-          const lastRequestTimestamp = await this.redis.get(`${key}:last`);
+          const lastRequestTimestamp = await this.redis.get(differenceKey);
+          // console.log("lastRequestTimestamp", lastRequestTimestamp);
+          // console.log("time since last request:", lastRequestTimestamp ? now - parseInt(lastRequestTimestamp) : "no last request");
           if (lastRequestTimestamp && (now - parseInt(lastRequestTimestamp) < this.difference)) {
             return this.createErrorResponse("Request too soon after the last one", key);
           }
@@ -167,10 +169,25 @@ export class RateLimit {
         }
       }
 
-      // increment the key in redis
-      const current = await this.redis.incr(key);
-      if (current === 1) {
-        await this.redis.pexpire(key, this.window);
+      const currentResult = await this.redis.multi()
+        .incr(key) // Increment the key and capture the new value
+        .set(differenceKey, now) // Set the last timestamp
+        .pexpire(differenceKey, this.difference) // Set expiration for the timestamp key
+        .exec((err, results) => {  // Execute the transaction
+          if (err) {
+            return undefined;
+          }
+          const current = results?.[0]?.[1]; // Get the value of the first command
+          if (current === 1) {
+            this.redis.pexpire(key, this.window); // Set expiration for the rate limit key
+          }
+        });
+
+      // get the current value of the key
+      const current = currentResult?.[0]?.[1] as number;
+      // console.log("this is the request number after we increment:", current)
+      if (current === undefined) {
+        return this.createErrorResponse("Failed to rate limit request", key);
       }
 
       // get success and important data 
@@ -182,6 +199,7 @@ export class RateLimit {
       // block the request in local cache if it exceeds the limit
       if (!success && this.localCache) {
         this.localCache.blockUntil(key, reset);
+        // console.log("Cache will block the next request")
       }
 
       return this.createLimitResponse(success, remaining, reset, key);
