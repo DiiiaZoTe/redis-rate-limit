@@ -1,7 +1,7 @@
 {
   "name": "@diiiazote/redis-rate-limit",
-  "version": "1.0.0",
-  "description": "A simple rate limiter for Redis using ioredis",
+  "version": "1.0.1",
+  "description": "A simple rate limiter for Redis using ioredis, works with Node based apps (Express, Next.js)",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/DiiiaZoTe/redis-rate-limit"
