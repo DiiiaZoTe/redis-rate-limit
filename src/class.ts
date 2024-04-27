@@ -44,6 +44,8 @@ export type RateLimitConfig = {
 }
 
 export type RateLimitResponse = {
+  /** key used for rate limiting */
+  key: string;
   /** whether the request is allowed */
   success: boolean;
   /** number of requests remaining */
@@ -56,8 +58,13 @@ export type RateLimitResponse = {
   ttl: number;
   /** error message */
   error?: string;
-  /** key used for rate limiting */
-  key: string;
+  /** status code:
+   *  -  0: success
+   *  - -1: redis server error
+   *  - -2: limit error - too many requests
+   *  - -3: difference error - request too soon after the last one
+  */
+  statusCode: number;
 }
 
 /**
@@ -150,7 +157,7 @@ export class RateLimit {
         const cacheResult = this.localCache.isBlocked(key);
         if (cacheResult.blocked) {
           // console.log("cache blocked the request");
-          return this.createLimitResponse(false, 0, cacheResult.reset, key);
+          return this.createErrorResponse("Too many requests.", key, -2);
         }
       }
 
@@ -161,11 +168,11 @@ export class RateLimit {
           // console.log("lastRequestTimestamp", lastRequestTimestamp);
           // console.log("time since last request:", lastRequestTimestamp ? now - parseInt(lastRequestTimestamp) : "no last request");
           if (lastRequestTimestamp && (now - parseInt(lastRequestTimestamp) < this.difference)) {
-            return this.createErrorResponse("Request too soon after the last one", key);
+            return this.createErrorResponse("Request too soon after the last one.", key, -3);
           }
         } catch (error) {
           this.logger(`Failed to check difference between requests - ${error}`);
-          return this.createErrorResponse("Failed to check difference between requests", key);
+          return this.createErrorResponse("Failed to check difference between requests.", key, -1);
         }
       }
 
@@ -187,7 +194,7 @@ export class RateLimit {
       const current = currentResult?.[0]?.[1] as number;
       // console.log("this is the request number after we increment:", current)
       if (current === undefined) {
-        return this.createErrorResponse("Failed to rate limit request", key);
+        return this.createErrorResponse("Failed to rate limit request.", key, -1);
       }
 
       // get success and important data 
@@ -199,6 +206,7 @@ export class RateLimit {
       // block the request in local cache if it exceeds the limit
       if (!success && this.localCache) {
         this.localCache.blockUntil(key, reset);
+        return this.createErrorResponse("Too many requests.", key, -2);
         // console.log("Cache will block the next request")
       }
 
@@ -207,7 +215,7 @@ export class RateLimit {
     } catch (error) {
       const message = "Failed to rate limit request";
       this.logger(`${message} - ${error}`);
-      return this.createErrorResponse(message, key);
+      return this.createErrorResponse(message, key, -1);
     }
   }
 
@@ -218,11 +226,12 @@ export class RateLimit {
       limit: this.maxRequest,
       reset: () => this.reset(key),
       ttl: reset - Date.now(),
-      key
+      key,
+      statusCode: 0
     };
   }
 
-  private createErrorResponse(error: string, key: string): RateLimitResponse {
+  private createErrorResponse(error: string, key: string, statusCode: number): RateLimitResponse {
     return {
       success: false,
       remaining: 0,
@@ -230,7 +239,8 @@ export class RateLimit {
       reset: () => this.reset(key),
       ttl: 0,
       error,
-      key
+      key,
+      statusCode: statusCode || -2
     };
   }
 
