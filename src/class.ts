@@ -1,25 +1,25 @@
-import Redis from 'ioredis';
+import Redis from "ioredis";
 
 const DEFAULT_CONFIG = {
   window: 1000,
   limit: 1,
   difference: 0,
   ephemeralCache: true,
-}
+};
 
 export type RateLimitConfig = {
   /** ioredis client instance */
   redis: Redis;
   /** prefix for redis key - useful to have multiple projects on one redis */
   prefix: string;
-  /** 
+  /**
    * window in milliseconds
    * @default 1000 if not provided or < 0
-   * @example 1000 or use:  
+   * @example 1000 or use:
    * ```ms("1s")``` or ```msPrecise(["1s"])``` (for multiple units)
    */
   window?: number;
-  /** 
+  /**
    * max requests allowed in window
    * @default 1
    */
@@ -27,21 +27,21 @@ export type RateLimitConfig = {
   /**
    * time difference in ms to account between 2 requests. Acts as a cooldown period.
    * @default 0 (no difference)
-   * @example 1000 or use:  
+   * @example 1000 or use:
    * ```ms("1s")``` or ```msPrecise(["1s"])``` (for multiple units)
    */
   difference?: number;
-  /** 
-   * adds an in-memory cache to store the rate limit data 
+  /**
+   * adds an in-memory cache to store the rate limit data
    * @default true
    */
-  ephemeralCache?: boolean
-  /** 
-   * custom logging function 
+  ephemeralCache?: boolean;
+  /**
+   * custom logging function
    * @default console.error
    */
   logger?: (error: any) => void;
-}
+};
 
 export type RateLimitResponse = {
   /** key used for rate limiting */
@@ -63,13 +63,13 @@ export type RateLimitResponse = {
    *  - -1: redis server error
    *  - -2: limit error - too many requests
    *  - -3: difference error - request too soon after the last one
-  */
+   */
   statusCode: number;
-}
+};
 
 /**
  * RateLimit class to limit requests based on the IP address
- * 
+ *
  * @param {RateLimitConfig} config RateLimitConfig
  * @param {Redis} config.redis ioredis client instance
  * @param {string} config.prefix prefix for redis key - useful to have multiple projects on one redis
@@ -78,22 +78,22 @@ export type RateLimitResponse = {
  * @param {number} [config.difference=0] time difference to account between 2 requests. Acts as a cooldown period.
  * @param {boolean} [config.ephemeralCache=true] adds an in-memory cache to store the rate limit data
  * @param {(error: any) => void} [config.logger=console.error] custom logging function
- * 
+ *
  * @example
  * ```typescript
  * import Redis from 'ioredis';
- * 
+ *
  * const redis = new Redis("redis_url");
- * 
+ *
  * const rateLimit = new RateLimit({
  *   redis,
  *   prefix: "rate-limit",
  *   window: "1s",
  *   maxRequest: 1
  * });
- * 
+ *
  * ...
- * 
+ *
  * const ip = req.headers['x-forwarded-for'] || "anonymous";
  * const response = await rateLimit.limit(ip);
  * if (!response.success) {
@@ -132,20 +132,26 @@ export class RateLimit {
     this.window = window;
     this.difference = difference;
     if (this.difference > this.window) {
-      console.error(`Difference cannot be greater than window size. Defaulting to the window size`);
+      console.error(
+        `Difference cannot be greater than window size. Defaulting to the window size`
+      );
       this.difference = this.window;
     }
 
     this.maxRequest = limit < 1 ? 5 : limit;
     this.prefix = prefix;
     this.localCache = ephemeralCache ? new Cache() : undefined;
-    this.logger = logger ? logger : (error: any) => { console.error(error) };
+    this.logger = logger
+      ? logger
+      : (error: any) => {
+        console.error(error);
+      };
   }
 
   /**
-   * 
+   *
    * @param id a unique identifier for the rate limit - usually the IP address
-   * @returns 
+   * @returns
    */
   public async limit(id: string): Promise<RateLimitResponse> {
     const key = `${this.prefix}:${id}`; // key for redis
@@ -157,7 +163,12 @@ export class RateLimit {
         const cacheResult = this.localCache.isBlocked(key);
         if (cacheResult.blocked) {
           // console.log("cache blocked the request");
-          return this.createErrorResponse("Too many requests.", key, -2);
+          return this.createErrorResponse({
+            error: "Too many requests.",
+            key,
+            statusCode: -2,
+            ttl: cacheResult.reset - now,
+          });
         }
       }
 
@@ -167,80 +178,127 @@ export class RateLimit {
           const lastRequestTimestamp = await this.redis.get(differenceKey);
           // console.log("lastRequestTimestamp", lastRequestTimestamp);
           // console.log("time since last request:", lastRequestTimestamp ? now - parseInt(lastRequestTimestamp) : "no last request");
-          if (lastRequestTimestamp && (now - parseInt(lastRequestTimestamp) < this.difference)) {
-            return this.createErrorResponse("Request too soon after the last one.", key, -3);
+          if (
+            lastRequestTimestamp &&
+            now - parseInt(lastRequestTimestamp) < this.difference
+          ) {
+            // get some data to return with the error
+            const current = parseInt((await this.redis.get(key)) as string);
+            const { remaining, ttl } = await this.getRemainingAndTTL(
+              key,
+              current
+            );
+            return this.createErrorResponse({
+              error: "Request too soon after the last one.",
+              key,
+              statusCode: -3,
+              ttl,
+              remaining,
+            });
           }
         } catch (error) {
           this.logger(`Failed to check difference between requests - ${error}`);
-          return this.createErrorResponse("Failed to check difference between requests.", key, -1);
+          return this.createErrorResponse({
+            error: "Failed to check difference between requests.",
+            key,
+            statusCode: -1,
+          });
         }
       }
 
-      const currentResult = await this.redis.multi()
+      const currentResult = await this.redis
+        .multi()
         .incr(key) // Increment the key and capture the new value
         .set(differenceKey, now) // Set the last timestamp
         .pexpire(differenceKey, this.difference) // Set expiration for the timestamp key
-        .exec((err, results) => {  // Execute the transaction
+        .exec((err, results) => {
+          // Execute the transaction
           if (err) {
             return undefined;
           }
-          const current = results?.[0]?.[1]; // Get the value of the first command
+          const current = parseInt(results?.[0]?.[1] as string); // Get the value of the first command
           if (current === 1) {
             this.redis.pexpire(key, this.window); // Set expiration for the rate limit key
           }
         });
 
       // get the current value of the key
-      const current = currentResult?.[0]?.[1] as number;
+      const current = parseInt(currentResult?.[0]?.[1] as string);
       // console.log("this is the request number after we increment:", current)
       if (current === undefined) {
-        return this.createErrorResponse("Failed to rate limit request.", key, -1);
+        return this.createErrorResponse({
+          error: "Failed to rate limit request.",
+          key,
+          statusCode: -1,
+        });
       }
 
-      // get success and important data 
+      // get success and important data
       const success = current <= this.maxRequest;
-      const remaining = Math.max(this.maxRequest - current, 0);
-      const ttl = await this.redis.pttl(key);
-      const reset = now + ttl;
+      const { remaining, ttl } = await this.getRemainingAndTTL(key, current);
 
       // block the request in local cache if it exceeds the limit
       if (!success && this.localCache) {
-        this.localCache.blockUntil(key, reset);
-        return this.createErrorResponse("Too many requests.", key, -2);
+        this.localCache.blockUntil(key, now + ttl);
+        return this.createErrorResponse({
+          error: "Too many requests.",
+          key,
+          statusCode: -2,
+          ttl,
+        });
         // console.log("Cache will block the next request")
       }
 
-      return this.createLimitResponse(success, remaining, reset, key);
-
+      return this.createLimitResponse({ success, remaining, ttl, key });
     } catch (error) {
       const message = "Failed to rate limit request";
       this.logger(`${message} - ${error}`);
-      return this.createErrorResponse(message, key, -1);
+      return this.createErrorResponse({ error: message, key, statusCode: -1 });
     }
   }
 
-  private createLimitResponse(success: boolean, remaining: number, reset: number, key: string): RateLimitResponse {
+  private async getRemainingAndTTL(
+    key: string,
+    current: number
+  ): Promise<{ remaining: number; ttl: number }> {
+    const remaining = Math.max(this.maxRequest - current, 0);
+    const ttl = await this.redis.pttl(key);
+    return { remaining, ttl };
+  }
+
+  private createLimitResponse(res: {
+    success: boolean;
+    remaining: number;
+    ttl: number;
+    key: string;
+  }): RateLimitResponse {
     return {
-      success,
-      remaining,
+      success: res.success,
+      remaining: res.remaining,
       limit: this.maxRequest,
-      reset: () => this.reset(key),
-      ttl: reset - Date.now(),
-      key,
-      statusCode: 0
+      reset: () => this.reset(res.key),
+      ttl: res.ttl,
+      key: res.key,
+      statusCode: 0,
     };
   }
 
-  private createErrorResponse(error: string, key: string, statusCode: number): RateLimitResponse {
+  private createErrorResponse(res: {
+    error: string;
+    key: string;
+    statusCode: number;
+    ttl?: number;
+    remaining?: number;
+  }): RateLimitResponse {
     return {
       success: false,
-      remaining: 0,
+      remaining: res.remaining ?? 0,
       limit: this.maxRequest,
-      reset: () => this.reset(key),
-      ttl: 0,
-      error,
-      key,
-      statusCode: statusCode || -2
+      reset: () => this.reset(res.key),
+      ttl: res.ttl ?? 0,
+      error: res.error,
+      key: res.key,
+      statusCode: res.statusCode || -2,
     };
   }
 
@@ -251,7 +309,7 @@ export class RateLimit {
         this.localCache.pop(key);
       }
     } catch (error) {
-      this.logger("Failed to reset rate limit - " + error)
+      this.logger("Failed to reset rate limit - " + error);
     }
   }
 }
