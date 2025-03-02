@@ -183,7 +183,8 @@ export class RateLimit {
             now - parseInt(lastRequestTimestamp) < this.difference
           ) {
             // get some data to return with the error
-            const { remaining, ttl } = await this.getKeyInfo(key);
+            const { remaining, ttl, error } = await this.getKeyInfo(key);
+            if (error) throw new Error(error);
             return this.createErrorResponse({
               error: "Request too soon after the last one.",
               key,
@@ -259,7 +260,8 @@ export class RateLimit {
       const { remaining, ttl } = await this.getRemainingAndTTL(key, current);
       return { current, remaining, ttl };
     } catch (error) {
-      return { error: `Failed to get key (${key}) info.` };
+      this.logger(`Failed to get key (${key}) info - ${error}`);
+      return { error: `Failed to get key (${key}) info.`};
     }
   }
 
