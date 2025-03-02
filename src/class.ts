@@ -183,11 +183,7 @@ export class RateLimit {
             now - parseInt(lastRequestTimestamp) < this.difference
           ) {
             // get some data to return with the error
-            const current = parseInt((await this.redis.get(key)) as string);
-            const { remaining, ttl } = await this.getRemainingAndTTL(
-              key,
-              current
-            );
+            const { remaining, ttl } = await this.getKeyInfo(key);
             return this.createErrorResponse({
               error: "Request too soon after the last one.",
               key,
@@ -255,6 +251,12 @@ export class RateLimit {
       this.logger(`${message} - ${error}`);
       return this.createErrorResponse({ error: message, key, statusCode: -1 });
     }
+  }
+
+  public async getKeyInfo(key: string) {
+    const current = parseInt((await this.redis.get(key)) as string) || 0;
+    const { remaining, ttl } = await this.getRemainingAndTTL(key, current);
+    return { current, remaining, ttl };
   }
 
   private async getRemainingAndTTL(
