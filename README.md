@@ -1,6 +1,6 @@
 <div align="center">
   <h1>@diiiazote/redis-rate-limit</h1>
-  <b>v1.0.6</b>
+  <b>v1.0.7</b>
   <p>A simple rate limiter for Redis using ioredis</p>
 </div>
 

@@ -1,6 +1,6 @@
 {
   "name": "@diiiazote/redis-rate-limit",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "A simple rate limiter for Redis using ioredis, works with Node based apps (Express, Next.js)",
   "repository": {
     "type": "git",
@@ -12,7 +12,8 @@
     "build": "tsc",
     "clean": "rm -rf dist",
     "link": "npm link",
-    "version": "npm version patch"
+    "version": "npm version patch",
+    "publish": "npm run build && npm publish"
   },
   "author": "Alex Vencel",
   "license": "ISC",
