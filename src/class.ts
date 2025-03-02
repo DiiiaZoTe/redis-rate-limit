@@ -254,9 +254,13 @@ export class RateLimit {
   }
 
   public async getKeyInfo(key: string) {
-    const current = parseInt((await this.redis.get(key)) as string) || 0;
-    const { remaining, ttl } = await this.getRemainingAndTTL(key, current);
-    return { current, remaining, ttl };
+    try {
+      const current = parseInt((await this.redis.get(key)) as string) || 0;
+      const { remaining, ttl } = await this.getRemainingAndTTL(key, current);
+      return { current, remaining, ttl };
+    } catch (error) {
+      return { error: `Failed to get key (${key}) info.` };
+    }
   }
 
   private async getRemainingAndTTL(
