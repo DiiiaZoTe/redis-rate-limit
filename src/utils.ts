@@ -9,10 +9,10 @@ export type Duration = `${number} ${Unit}` | `${number}${Unit}`;
  */
 export function ms(d: Duration): number {
   const match = d.match(/^(-?\d+)\s?(ms|s|m|h|d)$/);
-  if (!match) {
+  if (!match || !match[1] || !match[2]) {
     throw new Error(`Unable to parse window size: ${d}`);
   }
-  const time = Number.parseInt(match[1]!);
+  const time = Number.parseInt(match[1], 10);
   const unit = match[2] as Unit;
 
   switch (unit) {
@@ -41,7 +41,6 @@ export function ms(d: Duration): number {
 export function msPrecise(durations: Duration[]): number {
   return durations.reduce((acc, duration) => acc + ms(duration), 0);
 }
-
 
 /**
  * Convert milliseconds to the specified or most appropriate human-readable unit.
@@ -89,38 +88,41 @@ export function formatDuration(ms: number, units: string = "dhms"): string {
   const absMs = Math.abs(ms);
   const sign = ms < 0 ? "-" : "";
 
-  let result = [];
+  const result = [];
   let remainingMs = absMs;
 
   // Processing each unit in the order of magnitude
-  if (units.includes('d')) {
+  if (units.includes("d")) {
     const days = Math.floor(remainingMs / (1000 * 60 * 60 * 24));
     remainingMs -= days * 1000 * 60 * 60 * 24;
     result.push(`${days}d`);
   }
-  if (units.includes('h')) {
+  if (units.includes("h")) {
     const hours = Math.floor(remainingMs / (1000 * 60 * 60));
     remainingMs -= hours * 1000 * 60 * 60;
     result.push(`${hours}h`);
   }
-  if (units.includes('m')) {
+  if (units.includes("m")) {
     const minutes = Math.floor(remainingMs / (1000 * 60));
     remainingMs -= minutes * 1000 * 60;
     result.push(`${minutes}m`);
   }
-  if (units.includes('s')) {
+  if (units.includes("s")) {
     const seconds = Math.floor(remainingMs / 1000);
     remainingMs -= seconds * 1000;
     result.push(`${seconds}s`);
   }
-  if (units.includes('MS')) {
-    result.push(`${remainingMs}ms`);
+  if (units.includes("MS")) {
+    const milliseconds = Math.round(remainingMs * 100) / 100;
+    result.push(`${milliseconds}ms`);
   }
 
   // Ensuring the order from the largest to the smallest unit
-  const unitOrder = ['d', 'h', 'm', 's', 'MS'];
-  // @ts-ignore - TS doesn't like the sort function
-  result.sort((a, b) => unitOrder.indexOf(a[a.length - 1]) - unitOrder.indexOf(b[b.length - 2] || b[b.length - 1]));
+  const unitOrder = ["d", "h", "m", "s", "MS"];
+  result.sort(
+    (a, b) =>
+      unitOrder.indexOf(a[a.length - 1]) - unitOrder.indexOf(b[b.length - 2] || b[b.length - 1]),
+  );
 
   return sign + (result.length > 0 ? result.join(" ") : `0${units[units.length - 1]}`);
 }

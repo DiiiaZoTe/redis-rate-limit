@@ -1,4 +1,4 @@
-import Redis from "ioredis";
+import type Redis from "ioredis";
 
 const DEFAULT_CONFIG = {
   window: 1000,
@@ -40,7 +40,7 @@ export type RateLimitConfig = {
    * custom logging function
    * @default console.error
    */
-  logger?: (error: any) => void;
+  logger?: (error: unknown) => void;
 };
 
 export type RateLimitResponse = {
@@ -108,7 +108,7 @@ export class RateLimit {
   private maxRequest: number;
   private difference: number;
   private localCache: Cache | undefined;
-  private logger: (error: any) => void;
+  private logger: (error: unknown) => void;
 
   constructor({
     redis,
@@ -132,9 +132,7 @@ export class RateLimit {
     this.window = window;
     this.difference = difference;
     if (this.difference > this.window) {
-      console.error(
-        `Difference cannot be greater than window size. Defaulting to the window size`
-      );
+      console.error(`Difference cannot be greater than window size. Defaulting to the window size`);
       this.difference = this.window;
     }
 
@@ -143,9 +141,9 @@ export class RateLimit {
     this.localCache = ephemeralCache ? new Cache() : undefined;
     this.logger = logger
       ? logger
-      : (error: any) => {
-        console.error(error);
-      };
+      : (error: unknown) => {
+          console.error(error);
+        };
   }
 
   /**
@@ -178,10 +176,7 @@ export class RateLimit {
           const lastRequestTimestamp = await this.redis.get(differenceKey);
           // console.log("lastRequestTimestamp", lastRequestTimestamp);
           // console.log("time since last request:", lastRequestTimestamp ? now - parseInt(lastRequestTimestamp) : "no last request");
-          if (
-            lastRequestTimestamp &&
-            now - parseInt(lastRequestTimestamp) < this.difference
-          ) {
+          if (lastRequestTimestamp && now - parseInt(lastRequestTimestamp, 10) < this.difference) {
             // get some data to return with the error
             const { remaining, ttl, error } = await this.getKeyInfo(key);
             if (error) throw new Error(error);
@@ -213,14 +208,14 @@ export class RateLimit {
           if (err) {
             return undefined;
           }
-          const current = parseInt(results?.[0]?.[1] as string); // Get the value of the first command
+          const current = parseInt(results?.[0]?.[1] as string, 10); // Get the value of the first command
           if (current === 1) {
             this.redis.pexpire(key, this.window); // Set expiration for the rate limit key
           }
         });
 
       // get the current value of the key
-      const current = parseInt(currentResult?.[0]?.[1] as string);
+      const current = parseInt(currentResult?.[0]?.[1] as string, 10);
       // console.log("this is the request number after we increment:", current)
       if (current === undefined) {
         return this.createErrorResponse({
@@ -256,18 +251,18 @@ export class RateLimit {
 
   public async getKeyInfo(key: string) {
     try {
-      const current = parseInt((await this.redis.get(key)) as string) || 0;
+      const current = parseInt((await this.redis.get(key)) as string, 10) || 0;
       const { remaining, ttl } = await this.getRemainingAndTTL(key, current);
       return { current, remaining, ttl };
     } catch (error) {
       this.logger(`Failed to get key (${key}) info - ${error}`);
-      return { error: `Failed to get key (${key}) info.`};
+      return { error: `Failed to get key (${key}) info.` };
     }
   }
 
   private async getRemainingAndTTL(
     key: string,
-    current: number
+    current: number,
   ): Promise<{ remaining: number; ttl: number }> {
     const remaining = Math.max(this.maxRequest - current, 0);
     const ttl = await this.redis.pttl(key);
@@ -317,7 +312,7 @@ export class RateLimit {
         this.localCache.pop(key);
       }
     } catch (error) {
-      this.logger("Failed to reset rate limit - " + error);
+      this.logger(`Failed to reset rate limit - ${error}`);
     }
   }
 }

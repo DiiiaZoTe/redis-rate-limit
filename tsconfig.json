@@ -1,18 +1,19 @@
 {
   "compilerOptions": {
-    "target": "ES6",
     "baseUrl": "./",
     "paths": {
       "@/*": ["./*"]
     },
-    "outDir": "./dist",
-    "module": "CommonJS",
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "declaration": true,
+    "declarationMap": false,
+    "outDir": "dist",
     "strict": true,
-    "checkJs": true,
     "esModuleInterop": true,
-    "noUncheckedIndexedAccess": true,
-    "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "declaration": true
-  }
+    "skipLibCheck": true
+  },
+  "include": ["src"]
 }
